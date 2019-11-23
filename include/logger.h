@@ -3,70 +3,110 @@
 
 #include <memory>
 #include <string>
+#include <cstring>
 #include <cstdio>
 #include <cstdarg>
 #include <ctime>
 
-using namespace std;
+
+
+template<size_t BufferSize>
+class LogLane{
+
+    char buffer[2 * BufferSize];
+
+    bool use_time;
+    std::string prefix;
+    size_t buffer_index;
+    FILE *file;
+
+    inline void flush(){
+        fwrite(buffer, sizeof(char), buffer_index, file);
+        fflush(file);;
+        buffer_index= 0;
+    }
+
+    inline void dump(){
+        if (buffer_index >= BufferSize) {
+            flush();
+        }
+    }
+
+    LogLane(FILE *file): use_time(false), prefix(""), buffer_index(0), file(file){}
+    LogLane(): LogLane(stdout) {}
+
+public:
+    template<class... Args>
+    inline void operator()(const char *format, Args... args){
+        if (BufferSize > 0){ 
+            if(use_time){
+                time_t tt = time(NULL);
+                char *tt_str = ctime(&tt);
+                tt_str[strlen(tt_str)-1]='\0';
+                buffer_index += sprintf(buffer + buffer_index, "%s ",tt_str);
+            }
+            buffer_index += sprintf(buffer + buffer_index, "%s", prefix.c_str());
+            buffer_index += sprintf(buffer + buffer_index, format, args...);
+
+            dump();
+        }
+        else{
+            if(use_time){
+                time_t tt = time(NULL);
+                char *tt_str = ctime(&tt);
+                tt_str[strlen(tt_str)-1]='\0';
+                buffer_index += sprintf(buffer + buffer_index, "%s ",tt_str);
+            }
+            fprintf(file, "%s", prefix.c_str());
+            fprintf(file, format, args...);
+            fflush(file);
+        }
+    }
+
+    inline void operator()(const char *format){
+        if (BufferSize > 0){ 
+            if(use_time){
+                time_t tt = time(NULL);
+                char *tt_str = ctime(&tt);
+                tt_str[strlen(tt_str)-1]='\0';
+                buffer_index += sprintf(buffer + buffer_index, "%s ",tt_str);
+            }
+            buffer_index += sprintf(buffer + buffer_index, "%s", prefix.c_str());
+            buffer_index += sprintf(buffer + buffer_index, "%s", format);
+
+            dump();
+        }
+        else{
+            if(use_time){
+                time_t tt = time(NULL);
+                char *tt_str = ctime(&tt);
+                tt_str[strlen(tt_str)-1]='\0';
+                buffer_index += sprintf(buffer + buffer_index, "%s ",tt_str);
+            }
+            fprintf(file, "%s", prefix.c_str());
+            fprintf(file, "%s", format);
+            fflush(file);
+        }
+    }
+    friend class Logger;
+};
+
 
 class Logger {
 private:
+
     static const size_t BufferSize = 5 * 1024 * 1024;
-    FILE *debugf;
-    FILE *infof;
-    FILE *errorf;
-    char info_buf[2 * BufferSize] = {0};
-    char error_buf[2 * BufferSize] = {0};
-    size_t info_buf_size = 0;
-    size_t error_buf_size = 0;
-    string debug_prefix = "[DEBUG] ";
-    string info_prefix;
-    string error_prefix;
-    bool debug_time_flag = true;
-    bool info_time_flag = false;
-    bool error_time_flag = false;
 
-    /**
-     * Flushes the current log buffer
-     * @param fout file handler to flush
-     * @param buffer_size current size of the used buffer
-     * @param buffer current buffer
-     */
-    static void flush(FILE *fout, size_t &buffer_size, char *buffer) {
-        fwrite(buffer, sizeof(char), buffer_size, fout);
-        fflush(fout);
-        buffer_size = 0;
-    }
-
-    /**
-     * Flushes the buffer if it is full
-     * @param fout fout file handler to dump
-     * @param buffer_size current size of the used buffer
-     * @param buffer current buffer
-     */
-    static void dump(FILE *fout, size_t &buffer_size, char *buffer) {
-        if (buffer_size >= BufferSize) {
-            flush(fout, buffer_size, buffer);
-        }
-    }
-
-
-    Logger() : debugf(stderr), infof(stdout), errorf(stderr) {}
-
+    Logger() {}
 public:
-    ~Logger() {
-        flush(errorf, error_buf_size, error_buf);
-        flush(infof, info_buf_size, info_buf);
 
-        if (debugf != stderr) {
-            fclose(debugf);
-        }
-        if (infof != stdout) {
-            fclose(infof);
-        }
-        if (errorf != stderr) {
-            fclose(errorf);
-        }
+    LogLane<BufferSize> info;
+    LogLane<BufferSize> error;
+    LogLane<0> debug;
+
+    ~Logger() {
+        info.flush();
+        error.flush();
     }
 
 
@@ -89,20 +129,19 @@ public:
     }
 
     inline Logger &set_info(const std::string &str){
-        if (info_buf_size > 0) {
-            flush(infof, info_buf_size, info_buf);
-        }
-        infof = fopen(str.c_str(), "w+");
-        if (infof == NULL) {
+        info.flush();
+        info.file = fopen(str.c_str(), "w+");
+        if (info.file == NULL) {
             fputs("Could not open the info stream\n", stderr);
             exit(-1);
         }
+
         return *this;
     }
 
     inline Logger &set_debug(const std::string &str) {
-        debugf = fopen(str.c_str(), "w+");
-        if (debugf == NULL) {
+        debug.file = fopen(str.c_str(), "w+");
+        if (debug.file == NULL) {
             fputs("Could not open the debug stream\n", stderr);
             exit(-1);
         }
@@ -110,11 +149,9 @@ public:
     }
 
     inline Logger &set_error(const std::string &str){
-        if (error_buf_size > 0) {
-            flush(errorf, error_buf_size, error_buf);
-        }
-        errorf = fopen(str.c_str(), "w+");
-        if (errorf == NULL) {
+        error.flush();
+        error.file = fopen(str.c_str(), "w+");
+        if (error.file == NULL) {
             fputs("Could not open the error stream\n", stderr);
             exit(-1);
         }
@@ -122,65 +159,14 @@ public:
     }
 
     inline Logger &set_error_prefix(const std::string &prefix){
-        error_prefix = prefix;
+        error.prefix = prefix;
         return *this;
     }
 
     inline Logger &toggle_error_time() {
-        error_time_flag  = ! error_time_flag;
+        error.use_time  = ! error.use_time;
         return *this;
     }
-
-
-
-    /**
-     *  Logger command to log the debug level information
-     * @param format
-     * @param ...
-     */
-    inline void debug(const char *format, ...) {
-#ifdef DEBUG
-        va_list args;
-        va_start(args, format);
-        fprintf(debugf, format, args);
-        fflush(debugf);
-        va_end(args);
-#endif
-    }
-
-    /**
-     * Logger command to log the info level information
-     * @param format
-     * @param ...
-     */
-    inline void info(const char *format, ...) {
-        va_list args;
-        va_start(args, format);
-        info_buf_size += vsprintf(info_buf + info_buf_size, format, args);
-        va_end(args);
-        dump(infof, info_buf_size, info_buf);
-    }
-
-    /**
-     * Logger command to log the error level information
-     * @param format
-     * @param ...
-     */
-    inline void error(const char *format, ...) {
-        va_list args;
-        va_start(args, format);
-        if (error_time_flag) {
-            time_t tt = time(NULL);
-            char *tt_str = ctime(&tt);
-            tt_str[strlen(tt_str)-1]='\0';
-            error_buf_size += sprintf(error_buf + error_buf_size, "%s ",tt_str);
-        }
-        error_buf_size += sprintf(error_buf + error_buf_size, "%s", error_prefix.c_str());
-        error_buf_size += vsprintf(error_buf + error_buf_size, format, args);
-        va_end(args);
-        dump(errorf, error_buf_size, error_buf);
-    }
-
 };
 
 #endif

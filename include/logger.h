@@ -35,15 +35,15 @@ class LogLane{
     LogLane(FILE *file): use_time(false), prefix(""), buffer_index(0), file(file){}
     LogLane(): LogLane(stdout) {}
 
-    void set_prefix(const std::string &pfix){
+    inline void set_prefix(const std::string &pfix){
 	prefix = pfix;
     }
 
-    void toggle_time(){
+    inline void toggle_time(){
 	use_time = !use_time;
     }
 
-    void set_file(const std::string &filename){
+    inline void set_file(const std::string &filename){
 	file = fopen(filename.c_str(), "w+");
         if (file == NULL) {
             fputs("Could not open the debug stream\n", stderr);
@@ -118,15 +118,15 @@ class DummyLogLane{
 
     }
 
-    void set_prefix(const std::string &pfix){
+    inline void set_prefix(const std::string &pfix){
 
     }
 
-    void toggle_time(){
+    inline void toggle_time(){
 
     }
 
-    void set_file(const std::string &filename){
+    inline void set_file(const std::string &filename){
     }
     
     DummyLogLane() {}

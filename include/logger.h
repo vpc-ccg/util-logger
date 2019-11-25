@@ -8,17 +8,16 @@
 #include <cstdarg>
 #include <ctime>
 
-
 template<size_t BufferSize>
 class LogLane {
 private:
     char buffer[2 * BufferSize];
-
     bool use_time;
     std::string prefix;
     size_t buffer_index;
     FILE *file;
     bool is_std_stream;
+
     LogLane(FILE *file) : use_time(false), prefix(""), buffer_index(0), file(file), is_std_stream(true) {}
 
     LogLane() : LogLane(stdout) {}
@@ -36,27 +35,6 @@ private:
         }
     }
 
-    inline void set_prefix(const std::string &pfix) {
-        prefix = pfix;
-    }
-
-    inline void toggle_time() {
-        use_time = !use_time;
-    }
-
-    inline void set_file(const std::string &filename) {
-        if(!is_std_stream){
-            fclose(file);
-        }
-        is_std_stream = false;
-        file = fopen(filename.c_str(), "w+");
-        if (file == NULL) {
-            fputs("Could not open the debug stream\n", stderr);
-            exit(-1);
-        }
-    }
-
-
     inline char *get_time() {
         time_t tt = time(NULL);
         char *tt_str = ctime(&tt);
@@ -65,16 +43,41 @@ private:
     }
 
 public:
-    ~LogLane(){
-        if(!is_std_stream){
+    ~LogLane() {
+        flush();
+        if (!is_std_stream) {
             fclose(file);
         }
     }
+
+    inline LogLane &set_prefix(const std::string &pfix) {
+        prefix = pfix;
+        return *this;
+    }
+
+    inline LogLane &toggle_time() {
+        use_time = !use_time;
+        return *this;
+    }
+
+    inline LogLane &set_file(const std::string &filename) {
+        flush();
+        if (!is_std_stream) {
+            fclose(file);
+        }
+        is_std_stream = false;
+        file = fopen(filename.c_str(), "w+");
+        if (file == NULL) {
+            fputs("Could not open the debug stream\n", stderr);
+            exit(-1);
+        }
+        return *this;
+    }
+
     template<class... Args>
     inline void operator()(const char *format, Args... args) {
         if (BufferSize > 0) {
             if (use_time) {
-
                 buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
             }
             buffer_index += sprintf(buffer + buffer_index, "%s", prefix);
@@ -117,61 +120,47 @@ public:
 
 template<size_t BufferSize>
 class DummyLogLane {
+    inline void flush() {}
 
-    inline void flush() {
-
-    }
-
-    inline void dump() {
-
-    }
-
-    inline void set_prefix(const std::string &pfix) {
-
-    }
-
-    inline void toggle_time() {
-
-    }
-
-    inline void set_file(const std::string &filename) {
-    }
+    inline void dump() {}
 
     DummyLogLane() {}
 
 public:
-    template<class... Args>
-    inline void operator()(const char *format, Args... args) {
-    }
 
-    inline void operator()(const char *format) {
-    }
+    inline DummyLogLane &set_prefix(const std::string &pfix) {}
+
+    inline DummyLogLane &toggle_time() {}
+
+    inline DummyLogLane &set_file(const std::string &filename) {}
+
+    template<class... Args>
+    inline void operator()(const char *format, Args... args) {}
+
+    inline void operator()(const char *format) {}
 
     friend class Logger;
 };
 
 class Logger {
 private:
-
     static const size_t BufferSize = 5 * 1024 * 1024;
 
     Logger() {}
 
 public:
-
     LogLane<BufferSize> info{stdout};
     LogLane<BufferSize> error{stderr};
 #ifdef DEBUG
     LogLane<0> debug{stderr};
 #else
-    DummyLogLane<0> debug{stderr};
+    DummyLogLane<0> debug;
 #endif
 
     ~Logger() {
         info.flush();
         error.flush();
     }
-
 
     Logger(const Logger &) = delete;
 
@@ -187,35 +176,7 @@ public:
      */
     static auto &instance() {
         static const std::unique_ptr <Logger> logger{new Logger()};
-        //static Logger<BufferSize> logger;
         return *logger;
-    }
-
-    inline Logger &set_info(const std::string &str) {
-        info.flush();
-        info.set_file(str);
-        return *this;
-    }
-
-    inline Logger &set_debug(const std::string &str) {
-        debug.set_file(str);
-        return *this;
-    }
-
-    inline Logger &set_error(const std::string &str) {
-        error.flush();
-        error.set_file(str);
-        return *this;
-    }
-
-    inline Logger &set_error_prefix(const std::string &prefix) {
-        error.set_prefix(prefix);
-        return *this;
-    }
-
-    inline Logger &toggle_error_time() {
-        error.toggle_time();
-        return *this;
     }
 };
 

@@ -80,7 +80,7 @@ public:
             if (use_time) {
                 buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
             }
-            buffer_index += sprintf(buffer + buffer_index, "%s", prefix);
+            buffer_index += sprintf(buffer + buffer_index, "%s", prefix.c_str());
             buffer_index += sprintf(buffer + buffer_index, format, args...);
 
             dump();

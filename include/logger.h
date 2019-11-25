@@ -88,7 +88,7 @@ public:
             if (use_time) {
                 buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
             }
-            fprintf(file, "%s", prefix);
+            fprintf(file, "%s", prefix.c_str());
             fprintf(file, format, args...);
             fflush(file);
         }

@@ -35,6 +35,21 @@ class LogLane{
     LogLane(FILE *file): use_time(false), prefix(""), buffer_index(0), file(file){}
     LogLane(): LogLane(stdout) {}
 
+    inline void set_prefix(const std::string &pfix){
+	prefix = pfix;
+    }
+
+    inline void toggle_time(){
+	use_time = !use_time;
+    }
+
+    inline void set_file(const std::string &filename){
+	file = fopen(filename.c_str(), "w+");
+        if (file == NULL) {
+            fputs("Could not open the debug stream\n", stderr);
+            exit(-1);
+        }
+    }
 public:
     template<class... Args>
     inline void operator()(const char *format, Args... args){
@@ -92,6 +107,39 @@ public:
 };
 
 
+template<size_t BufferSize>
+class DummyLogLane{
+
+    inline void flush(){
+
+    }
+
+    inline void dump(){
+
+    }
+
+    inline void set_prefix(const std::string &pfix){
+
+    }
+
+    inline void toggle_time(){
+
+    }
+
+    inline void set_file(const std::string &filename){
+    }
+    
+    DummyLogLane() {}
+
+public:
+    template<class... Args>
+    inline void operator()(const char *format, Args... args){
+    }
+
+    inline void operator()(const char *format){
+    }
+    friend class Logger;
+};
 class Logger {
 private:
 
@@ -102,8 +150,11 @@ public:
 
     LogLane<BufferSize> info;
     LogLane<BufferSize> error;
+#ifdef DEBUG
     LogLane<0> debug;
-
+#else
+    DummyLogLane<0> debug;
+#endif
     ~Logger() {
         info.flush();
         error.flush();
@@ -130,41 +181,28 @@ public:
 
     inline Logger &set_info(const std::string &str){
         info.flush();
-        info.file = fopen(str.c_str(), "w+");
-        if (info.file == NULL) {
-            fputs("Could not open the info stream\n", stderr);
-            exit(-1);
-        }
-
+        info.set_file(str);
         return *this;
     }
 
     inline Logger &set_debug(const std::string &str) {
-        debug.file = fopen(str.c_str(), "w+");
-        if (debug.file == NULL) {
-            fputs("Could not open the debug stream\n", stderr);
-            exit(-1);
-        }
+        debug.set_file(str);
         return *this;
     }
 
     inline Logger &set_error(const std::string &str){
         error.flush();
-        error.file = fopen(str.c_str(), "w+");
-        if (error.file == NULL) {
-            fputs("Could not open the error stream\n", stderr);
-            exit(-1);
-        }
+        error.set_file(str);
         return *this;
     }
 
     inline Logger &set_error_prefix(const std::string &prefix){
-        error.prefix = prefix;
+        error.set_prefix(prefix);
         return *this;
     }
 
     inline Logger &toggle_error_time() {
-        error.use_time  = ! error.use_time;
+        error.toggle_time();
         return *this;
     }
 };

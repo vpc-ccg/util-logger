@@ -9,152 +9,164 @@
 #include <ctime>
 
 
-
 template<size_t BufferSize>
-class LogLane{
-
+class LogLane {
+private:
     char buffer[2 * BufferSize];
 
     bool use_time;
     std::string prefix;
     size_t buffer_index;
     FILE *file;
+    bool is_std_stream;
+    LogLane(FILE *file) : use_time(false), prefix(""), buffer_index(0), file(file), is_std_stream(true) {}
 
-    inline void flush(){
+    LogLane() : LogLane(stdout) {}
+
+
+    inline void flush() {
         fwrite(buffer, sizeof(char), buffer_index, file);
         fflush(file);;
-        buffer_index= 0;
+        buffer_index = 0;
     }
 
-    inline void dump(){
+    inline void dump() {
         if (buffer_index >= BufferSize) {
             flush();
         }
     }
 
-    LogLane(FILE *file): use_time(false), prefix(""), buffer_index(0), file(file){}
-    LogLane(): LogLane(stdout) {}
-
-    inline void set_prefix(const std::string &pfix){
-	prefix = pfix;
+    inline void set_prefix(const std::string &pfix) {
+        prefix = pfix;
     }
 
-    inline void toggle_time(){
-	use_time = !use_time;
+    inline void toggle_time() {
+        use_time = !use_time;
     }
 
-    inline void set_file(const std::string &filename){
-	file = fopen(filename.c_str(), "w+");
+    inline void set_file(const std::string &filename) {
+        if(!is_std_stream){
+            fclose(file);
+        }
+        is_std_stream = false;
+        file = fopen(filename.c_str(), "w+");
         if (file == NULL) {
             fputs("Could not open the debug stream\n", stderr);
             exit(-1);
         }
     }
+
+
+    inline char *get_time() {
+        time_t tt = time(NULL);
+        char *tt_str = ctime(&tt);
+        tt_str[strlen(tt_str) - 1] = '\0';
+        return tt_str;
+    }
+
 public:
+    ~LogLane(){
+        if(!is_std_stream){
+            fclose(file);
+        }
+    }
     template<class... Args>
-    inline void operator()(const char *format, Args... args){
-        if (BufferSize > 0){ 
-            if(use_time){
-                time_t tt = time(NULL);
-                char *tt_str = ctime(&tt);
-                tt_str[strlen(tt_str)-1]='\0';
-                buffer_index += sprintf(buffer + buffer_index, "%s ",tt_str);
+    inline void operator()(const char *format, Args... args) {
+        if (BufferSize > 0) {
+            if (use_time) {
+
+                buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
             }
-            buffer_index += sprintf(buffer + buffer_index, "%s", prefix.c_str());
+            buffer_index += sprintf(buffer + buffer_index, "%s", prefix);
             buffer_index += sprintf(buffer + buffer_index, format, args...);
 
             dump();
-        }
-        else{
-            if(use_time){
-                time_t tt = time(NULL);
-                char *tt_str = ctime(&tt);
-                tt_str[strlen(tt_str)-1]='\0';
-                buffer_index += sprintf(buffer + buffer_index, "%s ",tt_str);
+        } else {
+            if (use_time) {
+                buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
             }
-            fprintf(file, "%s", prefix.c_str());
+            fprintf(file, "%s", prefix);
             fprintf(file, format, args...);
             fflush(file);
         }
     }
 
-    inline void operator()(const char *format){
-        if (BufferSize > 0){ 
-            if(use_time){
-                time_t tt = time(NULL);
-                char *tt_str = ctime(&tt);
-                tt_str[strlen(tt_str)-1]='\0';
-                buffer_index += sprintf(buffer + buffer_index, "%s ",tt_str);
+    inline void operator()(const char *format) {
+        if (BufferSize > 0) {
+            if (use_time) {
+
+                buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
             }
             buffer_index += sprintf(buffer + buffer_index, "%s", prefix.c_str());
             buffer_index += sprintf(buffer + buffer_index, "%s", format);
 
             dump();
-        }
-        else{
-            if(use_time){
-                time_t tt = time(NULL);
-                char *tt_str = ctime(&tt);
-                tt_str[strlen(tt_str)-1]='\0';
-                buffer_index += sprintf(buffer + buffer_index, "%s ",tt_str);
+        } else {
+            if (use_time) {
+                buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
             }
             fprintf(file, "%s", prefix.c_str());
             fprintf(file, "%s", format);
             fflush(file);
         }
     }
+
     friend class Logger;
 };
 
 
 template<size_t BufferSize>
-class DummyLogLane{
+class DummyLogLane {
 
-    inline void flush(){
-
-    }
-
-    inline void dump(){
+    inline void flush() {
 
     }
 
-    inline void set_prefix(const std::string &pfix){
+    inline void dump() {
 
     }
 
-    inline void toggle_time(){
+    inline void set_prefix(const std::string &pfix) {
 
     }
 
-    inline void set_file(const std::string &filename){
+    inline void toggle_time() {
+
     }
-    
+
+    inline void set_file(const std::string &filename) {
+    }
+
     DummyLogLane() {}
 
 public:
     template<class... Args>
-    inline void operator()(const char *format, Args... args){
+    inline void operator()(const char *format, Args... args) {
     }
 
-    inline void operator()(const char *format){
+    inline void operator()(const char *format) {
     }
+
     friend class Logger;
 };
+
 class Logger {
 private:
 
     static const size_t BufferSize = 5 * 1024 * 1024;
 
     Logger() {}
+
 public:
 
-    LogLane<BufferSize> info;
-    LogLane<BufferSize> error;
+    LogLane<BufferSize> info{stdout};
+    LogLane<BufferSize> error{stderr};
 #ifdef DEBUG
-    LogLane<0> debug;
+    LogLane<0> debug{stderr};
 #else
-    DummyLogLane<0> debug;
+    DummyLogLane<0> debug{stderr};
 #endif
+
     ~Logger() {
         info.flush();
         error.flush();
@@ -179,7 +191,7 @@ public:
         return *logger;
     }
 
-    inline Logger &set_info(const std::string &str){
+    inline Logger &set_info(const std::string &str) {
         info.flush();
         info.set_file(str);
         return *this;
@@ -190,13 +202,13 @@ public:
         return *this;
     }
 
-    inline Logger &set_error(const std::string &str){
+    inline Logger &set_error(const std::string &str) {
         error.flush();
         error.set_file(str);
         return *this;
     }
 
-    inline Logger &set_error_prefix(const std::string &prefix){
+    inline Logger &set_error_prefix(const std::string &prefix) {
         error.set_prefix(prefix);
         return *this;
     }

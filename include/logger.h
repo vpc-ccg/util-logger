@@ -24,6 +24,8 @@ private:
     LogLane() : LogLane(stdout) {}
 
 
+
+
     inline void flush() {
         if( BufferSize == 0){
             return;
@@ -54,6 +56,12 @@ public:
         }
     }
 
+    inline void set_buffer_size(size_t val){
+
+        BufferSize = val;
+        dump();
+
+    }
     inline LogLane &set_prefix(const std::string &pfix) {
         prefix = pfix;
         return *this;

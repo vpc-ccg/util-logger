@@ -8,10 +8,11 @@
 #include <cstdarg>
 #include <ctime>
 
-template<size_t BufferSize>
+template<size_t MaxBufferSize>
 class LogLane {
 private:
-    char buffer[2 * BufferSize];
+    char buffer[2 * MaxBufferSize];
+    size_t BufferSize = MaxBufferSize;
     bool use_time;
     std::string prefix;
     size_t buffer_index;
@@ -86,7 +87,7 @@ public:
             dump();
         } else {
             if (use_time) {
-                buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
+                fprintf(file, "%s ", get_time());
             }
             fprintf(file, "%s", prefix.c_str());
             fprintf(file, format, args...);
@@ -106,7 +107,7 @@ public:
             dump();
         } else {
             if (use_time) {
-                buffer_index += sprintf(buffer + buffer_index, "%s ", get_time());
+                buffer_index += fprintf(file, "%s ", get_time());
             }
             fprintf(file, "%s", prefix.c_str());
             fprintf(file, "%s", format);

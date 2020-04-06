@@ -25,6 +25,9 @@ private:
 
 
     inline void flush() {
+        if( BufferSize == 0){
+            return;
+        }
         fwrite(buffer, sizeof(char), buffer_index, file);
         fflush(file);;
         buffer_index = 0;

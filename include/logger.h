@@ -140,11 +140,11 @@ class DummyLogLane {
 
 public:
 
-    inline DummyLogLane &set_prefix(const std::string &pfix) {}
+    inline DummyLogLane &set_prefix(const std::string &pfix) { return *this; }
 
-    inline DummyLogLane &toggle_time() {}
+    inline DummyLogLane &toggle_time() { return *this; }
 
-    inline DummyLogLane &set_file(const std::string &filename) {}
+    inline DummyLogLane &set_file(const std::string &filename) { return *this; }
 
     template<class... Args>
     inline void operator()(const char *format, Args... args) {}
